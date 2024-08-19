@@ -1,0 +1,4 @@
+.vscode
+build/
+uf2/
+**/.DS_Store
