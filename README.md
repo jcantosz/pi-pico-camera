@@ -25,8 +25,8 @@ export PICO_SDK_PATH=~/pico-sdk
 ```
 
 ```bash
-mkdir -p build
-cmake -S . -B build; cd build; make -j16; cd ..
+chmod +x build.sh
+./build.sh
 ```
 
 Todo/ideas:

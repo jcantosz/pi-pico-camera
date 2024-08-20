@@ -32,4 +32,33 @@ typedef enum{
 } ColorMask;
 
 
+// ---- Camera Functions ----
+// Color mask modes (BW = uint8 --> for bw and grayscale)
 uint16_t applyColorMask(uint16_t pixel, ColorMask mask);
+uint16_t applyColorMaskToBW(uint8_t bwPixel, ColorMask mask);
+
+// Camera process modes for different image fidelity
+void process_pixel_full_range(int x, int y, int index);
+void process_pixel_bw(int x, int y, int index);
+void process_pixel_grayscale(int x, int y, int index);
+
+// Calls one of the above functions based on the current camera mode
+void process_pixel(int x, int y, int index);
+
+// Read camera input and output to display buffer
+void run_camera();
+
+
+// ---- Button Functions ----
+// Change camera color mask
+void handleKey3Press();
+bool isKey3Pressed();
+bool isDebouncedKey3Pressed();
+
+// Change camera process modes
+void handleKey4Press();
+bool isKey4Pressed();
+bool isDebouncedKey4Pressed();
+
+// Naive debounce function
+void incrementDebounceCounters();

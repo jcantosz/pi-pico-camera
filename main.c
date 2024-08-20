@@ -25,6 +25,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 ******************************************************************************/
+
+// -----------------------------------------------------------------------------
+// Code Sections (ctrl/cmc + f these titles)
+//   - Color Mask Mode Switch Functions 
+//   - Pixel Processing Mode Functions
+//   - Main Camera Process Function
+//   - Color Mask Mode Switch Functions (Button 3)
+//   - Camera Fidelity Mode Switch Functions (Button 4)
+//   - Button Debounce Function
+//   - Entrypoint Function
+// =============================================================================
+
 #include <stdio.h>
 #include <tusb.h>
 #include "pico/stdlib.h"
@@ -59,31 +71,31 @@ CameraMode currentMode = FULL_RANGE_CAMERA;
 ColorMask currentColorMask = COLOR_MASK_BLACK;
 
 
-void process_pixel_full_range(int x, int y, int index) {
-    // Get current pixel from the image buffer
-    uint16_t c = image_buf[(y) * IMAGE_BUFF_WIDTH + (x)];
-    
-    // RED (Most significant 5 bits.)
-    // (c & 0xF8) << 8:
-    //      c & 0xF8: Masks the most significant 5 bits of c (the red component in 5-6-5 RGB format).
-    //      << 8: Shifts these 5 bits to the left by 8 positions, placing them in the most significant 5 bits of the 16-bit imageRGB.
-    // GREEN (Middle 6 bits.)
-    // (c & 0xFC) << 3:
-    //      c & 0xFC: Masks the most significant 6 bits of c (the green component in 5-6-5 RGB format).
-    //      << 3: Shifts these 6 bits to the left by 3 positions, placing them in the middle 6 bits of the 16-bit imageRGB.
-    // BLUE (Least significant 5 bits)
-    // (c & 0xF8) >> 3:
-    //      c & 0xF8: Masks the most significant 5 bits of c (the blue component in 5-6-5 RGB format).
-    //      >> 3: Shifts these 5 bits to the right by 3 positions, placing them in the least significant 5 bits of the 16-bit imageRGB.
+// ------------------------------
+// ---- Color Mask Functions ----
+// ==============================
+// Function to apply color mask to a pixel
+uint16_t applyColorMask(uint16_t pixel, ColorMask mask) {
+    uint8_t r = (pixel >> 11) & 0x1F;
+    uint8_t g = (pixel >> 5) & 0x3F;
+    uint8_t b = pixel & 0x1F;
 
-    // Get the RGB color from the pixel
-    uint16_t imageRGB = (((c & 0xF8) << 8) | ((c & 0xFC) << 3) | ((c & 0xF8) >> 3));
-    
-    imageRGB = applyColorMask(imageRGB, currentColorMask);
-    // Set the RGB color in the display buffer
-    displayBuf[index++] = (uint16_t)(imageRGB >> 8) & 0xFF;
-    displayBuf[index++] = (uint16_t)(imageRGB) & 0xFF;
-
+    switch (mask) {
+        case COLOR_MASK_BLACK:
+            return pixel;
+        case COLOR_MASK_RED:
+            return (r << 11);
+        case COLOR_MASK_PINK:
+            return (r << 11) | (b << 0);
+        case COLOR_MASK_GREEN:
+            return (g << 5);
+        case COLOR_MASK_BLUE:
+            return (b << 0);
+        case COLOR_MASK_YELLOW:
+            return (r << 11) | (g << 5);
+        default:
+            return pixel;
+    }
 }
 
 // Function to apply color mask to a black and white pixel
@@ -116,6 +128,9 @@ uint16_t applyColorMaskToBW(uint8_t bwPixel, ColorMask mask) {
     return (r << 11) | (g << 5) | b;
 }
 
+// -----------------------------------------
+// ---- Pixel Processing Mode Functions ----
+// =========================================
 void process_pixel_bw(int x, int y, int index) {
     // Get current pixel from the image buffer
     uint16_t c = image_buf[(y) * IMAGE_BUFF_WIDTH + (x)];
@@ -152,28 +167,31 @@ void process_pixel_grayscale(int x, int y, int index) {
     displayBuf[index++] = maskedPixel & 0xFF;
 }
 
-// Function to apply color mask to a pixel
-uint16_t applyColorMask(uint16_t pixel, ColorMask mask) {
-    uint8_t r = (pixel >> 11) & 0x1F;
-    uint8_t g = (pixel >> 5) & 0x3F;
-    uint8_t b = pixel & 0x1F;
+void process_pixel_full_range(int x, int y, int index) {
+    // Get current pixel from the image buffer
+    uint16_t c = image_buf[(y) * IMAGE_BUFF_WIDTH + (x)];
+    
+    // RED (Most significant 5 bits.)
+    // (c & 0xF8) << 8:
+    //      c & 0xF8: Masks the most significant 5 bits of c (the red component in 5-6-5 RGB format).
+    //      << 8: Shifts these 5 bits to the left by 8 positions, placing them in the most significant 5 bits of the 16-bit imageRGB.
+    // GREEN (Middle 6 bits.)
+    // (c & 0xFC) << 3:
+    //      c & 0xFC: Masks the most significant 6 bits of c (the green component in 5-6-5 RGB format).
+    //      << 3: Shifts these 6 bits to the left by 3 positions, placing them in the middle 6 bits of the 16-bit imageRGB.
+    // BLUE (Least significant 5 bits)
+    // (c & 0xF8) >> 3:
+    //      c & 0xF8: Masks the most significant 5 bits of c (the blue component in 5-6-5 RGB format).
+    //      >> 3: Shifts these 5 bits to the right by 3 positions, placing them in the least significant 5 bits of the 16-bit imageRGB.
 
-    switch (mask) {
-        case COLOR_MASK_BLACK:
-            return pixel;
-        case COLOR_MASK_RED:
-            return (r << 11);
-        case COLOR_MASK_PINK:
-            return (r << 11) | (b << 0);
-        case COLOR_MASK_GREEN:
-            return (g << 5);
-        case COLOR_MASK_BLUE:
-            return (b << 0);
-        case COLOR_MASK_YELLOW:
-            return (r << 11) | (g << 5);
-        default:
-            return pixel;
-    }
+    // Get the RGB color from the pixel
+    uint16_t imageRGB = (((c & 0xF8) << 8) | ((c & 0xFC) << 3) | ((c & 0xF8) >> 3));
+    
+    imageRGB = applyColorMask(imageRGB, currentColorMask);
+    // Set the RGB color in the display buffer
+    displayBuf[index++] = (uint16_t)(imageRGB >> 8) & 0xFF;
+    displayBuf[index++] = (uint16_t)(imageRGB) & 0xFF;
+
 }
 
 void process_pixel(int x, int y, int index){
@@ -195,7 +213,9 @@ void process_pixel(int x, int y, int index){
 }
 
 
-
+// --------------------------------------
+// ---- Main Camera Process Function ----
+// ======================================
 void run_camera() {
 
     // Notify core 0 that core 1 is ready
@@ -250,6 +270,9 @@ void run_camera() {
     }
 }
 
+// ------------------------------------------
+// ---- Color Mask Mode Switch Functions ----
+// ==========================================
 // Function to handle KEY3_PIN press
 void handleKey3Press() {
     // Rotate through the color masks
@@ -291,6 +314,9 @@ bool isDebouncedKey3Pressed() {
     return false;
 }
 
+// -----------------------------------------------
+// ---- Camera Fidelity Mode Switch Functions ----
+// ===============================================
 // Function to handle KEY4_PIN press
 void handleKey4Press() {
     // Cycle through the camera modes
@@ -319,6 +345,9 @@ bool isDebouncedKey4Pressed() {
     return false;
 }
 
+// ----------------------------------
+// ---- Button Debounce Function ----
+// ==================================
 void incrementDebounceCounters() {
     if (debounceIncrementorKey3 > 0) {
         debounceIncrementorKey3++;
@@ -334,6 +363,9 @@ void incrementDebounceCounters() {
     }
 }
 
+// -----------------------------
+// ---- Entrypoint Function ----
+// =============================
 int main() {
 
     int loops = 20;
@@ -369,6 +401,8 @@ int main() {
             imageReady = 0;
         }
 		DEV_Delay_ms(1);
+
+        // Button handling
         // Could do interrupts but this is simple
         if(isDebouncedKey3Pressed()) {
             handleKey3Press();
